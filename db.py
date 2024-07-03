@@ -37,6 +37,10 @@ class BaseDatabase:
             self.sqlite_connection.close()
 
 
+class SorterIdInvalidException(BaseException):
+    pass
+
+
 class PartSorter(BaseDatabase):
     def create_tables(self):
         with self.sqlite_connection:
@@ -57,14 +61,18 @@ class PartSorter(BaseDatabase):
                                                                     )""")
 
     def create_location(self, uid: str, name: str, icon: str, tags: str, attributes: dict):
+        if uid in self.get_location_ids():
+            raise SorterIdInvalidException(f"Another location with id: {uid} already exists")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("INSERT INTO locations (id,name,icon,tags,attrs)VALUES(?,?,?,?,?)",
+            cursor.execute("INSERT INTO locations (id,name,icon,tags,attrs) VALUES(?,?,?,?,?)",
                            (uid, name, icon, tags, json.dumps(attributes)))
             cursor.close()
         logger.info(f"Created new location with id: {uid}")
 
     def delete_location(self, uid: str):
+        if uid not in self.get_location_ids():
+            raise SorterIdInvalidException(f"Location with id: {uid} does not exist")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             cursor.execute("DELETE FROM locations WHERE id=?",
@@ -80,6 +88,18 @@ class PartSorter(BaseDatabase):
             for row in rows:
                 if 'attrs' in row and isinstance(row['attrs'], str):
                     row['attrs'] = json.loads(row['attrs'])
+
+            return rows
+        except sqlite3.Error as e:
+            logger.error(f"Experienced error getting locations, returning empty list: {repr(e)}")
+            return []
+
+    def get_location_ids(self) -> list:
+        try:
+            cursor = self.sqlite_connection.cursor()
+            cursor.execute("SELECT id FROM locations")
+            rows = cursor.fetchall()
+            rows = [row[0] for row in rows]
 
             return rows
         except sqlite3.Error as e:
@@ -115,6 +135,17 @@ class PartSorter(BaseDatabase):
             cursor.close()
         logger.info(f"Updated location with id: {uid}")
 
+    def create_sorter(self, uid: str, location: str, name: str, icon: str, tags: str, attributes: dict):
+        if location not in self.get_location_ids():
+            raise SorterIdInvalidException(f"ID: {uid} not in locations, {self.get_location_ids()}")
+
+        with self.sqlite_connection:
+            cursor = self.sqlite_connection.cursor()
+            cursor.execute("INSERT INTO sorters (id,location,name,icon,tags,attrs) VALUES(?,?,?,?,?,?)",
+                           (uid, location, name, icon, tags, json.dumps(attributes)))
+            cursor.close()
+        logger.info(f"Created new sorter with id: {uid}")
+
 
 if __name__ == "__main__":
     print("Interactive Part Sorter Database Management")
@@ -128,7 +159,7 @@ if __name__ == "__main__":
         print("3) Get locations")
         print("4) Update location")
         print("5) Quit")
-        print("Total changes", sorter.total_changes)
+        print("Total changes made to database", sorter.total_changes)
         inp = input(">>> ")
         if not inp.isdigit():
             continue
