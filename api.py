@@ -7,7 +7,6 @@ import sorter  # Make sure to import your database module here
 
 app = FastAPI()
 
-
 origins = [
     "*",
 ]
@@ -27,7 +26,7 @@ class Location(BaseModel):
     id: str
     name: str
     icon: str
-    tags: Optional[str] = None
+    tags: str = None
     attrs: dict
 
 
@@ -36,9 +35,19 @@ class Sorter(BaseModel):
     location: str
     name: str
     icon: str
-    tags: Optional[str] = None
+    tags: str = None
     attrs: dict
 
+
+class Part(BaseModel):
+    id: str
+    sorter: str
+    name: str
+    quantity: int
+    quantity_type: str
+    enable_quantity: bool
+    tags: str = None
+    attrs: dict
 
 @app.post("/locations/", response_model=Location, status_code=201)
 def create_location(location: Location):
@@ -84,7 +93,8 @@ def delete_location(location_id: str):
 @app.post("/sorters/", response_model=Sorter, status_code=201)
 def create_sorter(sorter_item: Sorter):
     try:
-        part_sorter.create_sorter(sorter_item.id, sorter_item.location, sorter_item.name, sorter_item.icon, sorter_item.tags, sorter_item.attrs)
+        part_sorter.create_sorter(sorter_item.id, sorter_item.location, sorter_item.name, sorter_item.icon,
+                                  sorter_item.tags, sorter_item.attrs)
         return sorter_item
     except sorter.SorterIdInvalidException as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -107,7 +117,8 @@ def get_sorter(sorter_id: str):
 @app.put("/sorters/{sorter_id}", response_model=Sorter)
 def update_sorter(sorter_id: str, sorter_item: Sorter):
     try:
-        part_sorter.update_sorter(sorter_id, sorter_item.location, sorter_item.name, sorter_item.icon, sorter_item.tags, sorter_item.attrs)
+        part_sorter.update_sorter(sorter_id, sorter_item.location, sorter_item.name, sorter_item.icon, sorter_item.tags,
+                                  sorter_item.attrs)
         return sorter_item
     except sorter.SorterIdInvalidException as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -122,6 +133,57 @@ def delete_sorter(sorter_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/parts_individual/", response_model=Part, status_code=201)
+def create_sorter(part_item: Part):
+    try:
+        part_sorter.create_part(part_item.id, part_item.sorter, part_item.name, part_item.quantity, part_item.quantity_type, part_item.enable_quantity, part_item.tags, part_item.attrs)
+        return part_item
+    except sorter.SorterIdInvalidException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/parts/", response_model=List[Part])
+def get_parts():
+    return part_sorter.get_parts()
+
+
+@app.get("/parts/{sorter_id}", response_model=List[Part])
+def get_parts(sorter_id: str):
+    parts = part_sorter.get_parts()
+    parts_in_sorter = []
+
+    for part in parts:
+        if part['sorter'] == sorter_id:
+            parts_in_sorter.append(part)
+    return parts_in_sorter
+
+
+@app.put("/parts_individual/{part_id}", response_model=Part)
+def update_part(part_id: str, part_item: Part):
+    try:
+        part_sorter.update_part(part_id, part_item.sorter, part_item.name, part_item.quantity, part_item.quantity_type, part_item.enable_quantity, part_item.tags, part_item.attrs)
+        return part_item
+    except sorter.SorterIdInvalidException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/parts_individual/{part_id}")
+def get_part(part_id: str):
+    parts = part_sorter.get_parts()
+    for part in parts:
+        if part['id'] == part_id:
+            return part
+    raise HTTPException(status_code=404, detail="Part not found")
+
+@app.delete("/parts_individual/{part_id}")
+def delete_part(part_id: str):
+    try:
+        part_sorter.delete_part(part_id)
+        return {"detail": "Sorter deleted successfully"}
+    except sorter.SorterIdInvalidException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8000)
