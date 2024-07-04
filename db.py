@@ -7,7 +7,7 @@ Error = sqlite3.Error
 class BaseDatabase:
     def __init__(self):
         # Connect to DB and create a cursor
-        self.sqlite_connection = sqlite3.connect('sql.db')
+        self.sqlite_connection = sqlite3.connect('sql.db', check_same_thread=False)
         logger.success("Database initialized")
         logger.info(f"SQLite version: {self.get_sqlite_version()}")
 
