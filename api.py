@@ -65,6 +65,10 @@ class Part(BaseModel):
     tags: str
     attrs: dict
 
+class PartImageNullable(BaseModel):
+    id: str
+    image: str | None
+
 @app.post("/locations/", response_model=Location, status_code=201)
 def create_location(location: Location):
     try:
@@ -166,12 +170,12 @@ def get_parts():
 
 @app.get("/parts/{sorter_id}", response_model=List[Part])
 def get_parts_from_sorter(sorter_id: str):
-    parts = part_sorter.get_parts()
-    print(parts)
+    parts: list[dict] = part_sorter.get_parts()
     parts_in_sorter = []
 
     for part in parts:
         if part['sorter'] == sorter_id:
+            part.pop("image")
             parts_in_sorter.append(part)
     return parts_in_sorter
 
@@ -186,11 +190,17 @@ def update_part(part_id: str, part_item: PartNullable):
     except sorter.SorterIdInvalidException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.put("/parts_individual/{part_id}/image", response_model=PartImageNullable)
+def set_part_image(part_id: str, part_item: PartImageNullable):
+    try:
+        part_sorter.set_part_image(part_id, part_item.image)
+        return part_item
+    except sorter.SorterIdInvalidException as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/parts_individual/{part_id}")
 def get_part(part_id: str):
     parts = part_sorter.get_parts()
-    print(parts)
     for part in parts:
         if part['id'] == part_id:
             return part

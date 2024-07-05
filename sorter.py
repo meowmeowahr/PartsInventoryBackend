@@ -41,6 +41,17 @@ class PartSorter(db.BaseDatabase):
                                                                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                                                         attrs TEXT NOT NULL
                                                                         )""")
+            
+            self.sqlite_connection.execute("""
+                                            CREATE TRIGGER IF NOT EXISTS update_timestamp
+                                            AFTER UPDATE ON parts
+                                            FOR EACH ROW
+                                            BEGIN
+                                                UPDATE parts
+                                                SET updated_at = CURRENT_TIMESTAMP
+                                                WHERE id = OLD.id;
+                                            END;
+                                            """)
 
     def create_location(self, uid: str, name: str, icon: str, tags: str, attributes: dict):
         if uid in self.get_location_ids():
@@ -222,6 +233,12 @@ class PartSorter(db.BaseDatabase):
                            (uid, sorter, name, tags, quantity, quantity_type, enable_quantity, price, notes, location, json.dumps(attributes)))
             cursor.close()
         logger.info(f"Created new part with id: {uid}")
+
+    def set_part_image(self, uid: str, image: str | None):
+        cursor = self.sqlite_connection.cursor()
+        cursor.execute("UPDATE parts SET image = ? WHERE id = ?", (image, uid))
+        cursor.close()
+        self.sqlite_connection.commit()
 
     def delete_part(self, uid: str):
         if uid not in self.get_part_ids():
