@@ -30,10 +30,13 @@ class PartSorter(db.BaseDatabase):
                                                                         sorter TEXT NOT NULL,
                                                                         name TEXT NOT NULL,
                                                                         image BLOB,
-                                                                        tags TEXT,
+                                                                        tags TEXT NOT NULL DEFAULT '',
                                                                         quantity INTEGER NOT NULL,
                                                                         quantity_type TEXT NOT NULL DEFAULT 'pcs',
                                                                         enable_quantity BOOLEAN NOT NULL DEFAULT TRUE,
+                                                                        price DECIMAL NOT NULL DEFAULT 0.00,
+                                                                        notes TEXT,
+                                                                        location TEXT NOT NULL,
                                                                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                                                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                                                         attrs TEXT NOT NULL
@@ -204,7 +207,7 @@ class PartSorter(db.BaseDatabase):
             cursor.close()
         logger.info(f"Updated sorter with id: {uid}")
 
-    def create_part(self, uid: str, sorter: str, name: str, quantity: int, quantity_type: str, enable_quantity: bool, tags: str, attributes: dict):
+    def create_part(self, uid: str, sorter: str, name: str, quantity: int, quantity_type: str, enable_quantity: bool, tags: str, price: float, notes: str, location: str, attributes: dict):
         if sorter not in self.get_sorter_ids():
             raise SorterIdInvalidException(f"Sorter ID: {sorter} not in sorters, {self.get_sorter_ids()}")
 
@@ -214,9 +217,9 @@ class PartSorter(db.BaseDatabase):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             cursor.execute("INSERT INTO sorters "
-                           "(id,sorter,name,tags,quantity,quantity_type,enable_quntity,attrs) "
-                           "VALUES(?,?,?,?,?,?,?,?)",
-                           (uid, sorter, name, tags, quantity, quantity_type, enable_quantity, json.dumps(attributes)))
+                           "(id,sorter,name,tags,quantity,quantity_type,enable_quantity,price,notes,location,attrs) "
+                           "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                           (uid, sorter, name, tags, quantity, quantity_type, enable_quantity, price, notes, location, json.dumps(attributes)))
             cursor.close()
         logger.info(f"Created new part with id: {uid}")
 
@@ -260,7 +263,7 @@ class PartSorter(db.BaseDatabase):
             logger.error(f"Experienced error getting part ids, returning empty list: {repr(e)}")
             return []
 
-    def update_part(self, uid: str, sorter: str, name: str, quantity: int, quantity_type: str, enable_quantity: bool, tags: str, attributes: dict):
+    def update_part(self, uid: str, sorter: str | None, name: str | None, quantity: int | None, quantity_type: str | None, enable_quantity: bool | None, tags: str | None, price: float | None, notes: str | None, location: str | None, attributes: dict | None):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             updates = []
@@ -289,6 +292,18 @@ class PartSorter(db.BaseDatabase):
             if tags is not None:
                 updates.append("tags = ?")
                 params.append(tags)
+
+            if price is not None:
+                updates.append("price = ?")
+                params.append(price)
+
+            if notes is not None:
+                updates.append("notes = ?")
+                params.append(notes)
+
+            if location is not None:
+                updates.append("location = ?")
+                params.append(location)
 
             if attributes is not None:
                 updates.append("attrs = ?")

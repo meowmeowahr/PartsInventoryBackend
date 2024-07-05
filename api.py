@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 import sorter  # Make sure to import your database module here
 
@@ -26,7 +26,7 @@ class Location(BaseModel):
     id: str
     name: str
     icon: str
-    tags: str = None
+    tags: str
     attrs: dict
 
 
@@ -35,18 +35,34 @@ class Sorter(BaseModel):
     location: str
     name: str
     icon: str
-    tags: str = None
+    tags: str
     attrs: dict
 
+
+class PartNullable(BaseModel):
+    id: str
+    sorter: str | None
+    name: str | None
+    quantity: int | None
+    quantity_type: str | None
+    enable_quantity: bool | None
+    price: float | None
+    notes: str | None
+    location: str | None
+    tags: str | None = None
+    attrs: dict | None
 
 class Part(BaseModel):
     id: str
     sorter: str
-    name: str
-    quantity: int
-    quantity_type: str
-    enable_quantity: bool
-    tags: str = None
+    name: str 
+    quantity: int 
+    quantity_type: str 
+    enable_quantity: bool 
+    price: float
+    notes: str
+    location: str
+    tags: str
     attrs: dict
 
 @app.post("/locations/", response_model=Location, status_code=201)
@@ -134,9 +150,10 @@ def delete_sorter(sorter_id: str):
 
 
 @app.post("/parts_individual/", response_model=Part, status_code=201)
-def create_sorter(part_item: Part):
+def create_part(part_item: Part):
     try:
-        part_sorter.create_part(part_item.id, part_item.sorter, part_item.name, part_item.quantity, part_item.quantity_type, part_item.enable_quantity, part_item.tags, part_item.attrs)
+        part_sorter.create_part(part_item.id, part_item.sorter, part_item.name, part_item.quantity,
+                                part_item.quantity_type, part_item.enable_quantity, part_item.tags, part_item.price, part_item.notes, part_item.location, part_item.attrs)
         return part_item
     except sorter.SorterIdInvalidException as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -148,8 +165,9 @@ def get_parts():
 
 
 @app.get("/parts/{sorter_id}", response_model=List[Part])
-def get_parts(sorter_id: str):
+def get_parts_from_sorter(sorter_id: str):
     parts = part_sorter.get_parts()
+    print(parts)
     parts_in_sorter = []
 
     for part in parts:
@@ -158,21 +176,26 @@ def get_parts(sorter_id: str):
     return parts_in_sorter
 
 
-@app.put("/parts_individual/{part_id}", response_model=Part)
-def update_part(part_id: str, part_item: Part):
+@app.put("/parts_individual/{part_id}", response_model=PartNullable)
+def update_part(part_id: str, part_item: PartNullable):
     try:
-        part_sorter.update_part(part_id, part_item.sorter, part_item.name, part_item.quantity, part_item.quantity_type, part_item.enable_quantity, part_item.tags, part_item.attrs)
+        part_sorter.update_part(part_id, part_item.sorter, part_item.name, part_item.quantity, part_item.quantity_type,
+                                part_item.enable_quantity, part_item.tags, part_item.price, part_item.notes,
+                                part_item.location, part_item.attrs)
         return part_item
     except sorter.SorterIdInvalidException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.get("/parts_individual/{part_id}")
 def get_part(part_id: str):
     parts = part_sorter.get_parts()
+    print(parts)
     for part in parts:
         if part['id'] == part_id:
             return part
     raise HTTPException(status_code=404, detail="Part not found")
+
 
 @app.delete("/parts_individual/{part_id}")
 def delete_part(part_id: str):
@@ -185,5 +208,4 @@ def delete_part(part_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="127.0.0.1", port=8000)
