@@ -4,17 +4,18 @@ from loguru import logger
 
 Error = sqlite3.Error
 
+
 class BaseDatabase:
     def __init__(self):
         # Connect to DB and create a cursor
-        self.sqlite_connection = sqlite3.connect('sql.db', check_same_thread=False)
+        self.sqlite_connection = sqlite3.connect("sql.db", check_same_thread=False)
         logger.success("Database initialized")
         logger.info(f"SQLite version: {self.get_sqlite_version()}")
 
         self.create_tables()
 
     def get_sqlite_version(self):
-        query = 'select sqlite_version();'
+        query = "select sqlite_version();"
         cursor = self.sqlite_connection.cursor()
         cursor.execute(query)
         result = cursor.fetchall()

@@ -13,29 +13,39 @@ import sorter3
 class PartSorter(db.BaseDatabase):
     def create_tables(self):
         with self.sqlite_connection:
-            self.sqlite_connection.execute("""CREATE TABLE IF NOT EXISTS locations (
+            self.sqlite_connection.execute(
+                """CREATE TABLE IF NOT EXISTS locations (
                                                                     id TEXT PRIMARY KEY UNIQUE, 
                                                                     name TEXT NOT NULL, 
                                                                     icon TEXT NOT NULL, 
                                                                     tags TEXT,
                                                                     attrs TEXT NOT NULL
-                                                                    )""")
-            self.sqlite_connection.execute("""CREATE TABLE IF NOT EXISTS sorters (
+                                                                    )"""
+            )
+            self.sqlite_connection.execute(
+                """CREATE TABLE IF NOT EXISTS sorters (
                                                                     id TEXT PRIMARY KEY UNIQUE,
                                                                     location TEXT NOT NULL,
                                                                     name TEXT NOT NULL,
                                                                     icon TEXT NOT NULL,
                                                                     tags TEXT,
                                                                     attrs TEXT NOT NULL
-                                                                    )""")
+                                                                    )"""
+            )
 
-    def create_location(self, uid: str, name: str, icon: str, tags: str, attributes: dict):
+    def create_location(
+        self, uid: str, name: str, icon: str, tags: str, attributes: dict
+    ):
         if uid in self.get_location_ids():
-            raise SorterIdInvalidException(f"Another location with id: {uid} already exists")
+            raise SorterIdInvalidException(
+                f"Another location with id: {uid} already exists"
+            )
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("INSERT INTO locations (id,name,icon,tags,attrs) VALUES(?,?,?,?,?)",
-                           (uid, name, icon, tags, json.dumps(attributes)))
+            cursor.execute(
+                "INSERT INTO locations (id,name,icon,tags,attrs) VALUES(?,?,?,?,?)",
+                (uid, name, icon, tags, json.dumps(attributes)),
+            )
             cursor.close()
         logger.info(f"Created new location with id: {uid}")
 
@@ -44,8 +54,7 @@ class PartSorter(db.BaseDatabase):
             raise SorterIdInvalidException(f"Location with id: {uid} does not exist")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM locations WHERE id=?",
-                           (uid,))
+            cursor.execute("DELETE FROM locations WHERE id=?", (uid,))
 
     def get_locations(self) -> list:
         try:
@@ -55,12 +64,14 @@ class PartSorter(db.BaseDatabase):
             columns = [col[0] for col in cursor.description]
             rows = [dict(zip(columns, row)) for row in rows]
             for row in rows:
-                if 'attrs' in row and isinstance(row['attrs'], str):
-                    row['attrs'] = json.loads(row['attrs'])
+                if "attrs" in row and isinstance(row["attrs"], str):
+                    row["attrs"] = json.loads(row["attrs"])
 
             return rows
         except sqlite3.Error as e:
-            logger.error(f"Experienced error getting locations, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting locations, returning empty list: {repr(e)}"
+            )
             return []
 
     def get_location_ids(self) -> list:
@@ -72,10 +83,19 @@ class PartSorter(db.BaseDatabase):
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting locations, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting locations, returning empty list: {repr(e)}"
+            )
             return []
 
-    def update_location(self, uid: str, name: str = None, icon: str = None, tags: str = None, attributes: dict = None):
+    def update_location(
+        self,
+        uid: str,
+        name: str = None,
+        icon: str = None,
+        tags: str = None,
+        attributes: dict = None,
+    ):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             updates = []
@@ -104,14 +124,20 @@ class PartSorter(db.BaseDatabase):
             cursor.close()
         logger.info(f"Updated location with id: {uid}")
 
-    def create_sorter(self, uid: str, location: str, name: str, icon: str, tags: str, attributes: dict):
+    def create_sorter(
+        self, uid: str, location: str, name: str, icon: str, tags: str, attributes: dict
+    ):
         if location not in self.get_location_ids():
-            raise SorterIdInvalidException(f"ID: {uid} not in locations, {self.get_location_ids()}")
+            raise SorterIdInvalidException(
+                f"ID: {uid} not in locations, {self.get_location_ids()}"
+            )
 
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("INSERT INTO sorters (id,location,name,icon,tags,attrs) VALUES(?,?,?,?,?,?)",
-                           (uid, location, name, icon, tags, json.dumps(attributes)))
+            cursor.execute(
+                "INSERT INTO sorters (id,location,name,icon,tags,attrs) VALUES(?,?,?,?,?,?)",
+                (uid, location, name, icon, tags, json.dumps(attributes)),
+            )
             cursor.close()
         logger.info(f"Created new sorter with id: {uid}")
 
@@ -120,8 +146,7 @@ class PartSorter(db.BaseDatabase):
             raise SorterIdInvalidException(f"Sorter with id: {uid} does not exist")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM sorters WHERE id=?",
-                           (uid,))
+            cursor.execute("DELETE FROM sorters WHERE id=?", (uid,))
 
     def get_sorters(self) -> list:
         try:
@@ -131,12 +156,14 @@ class PartSorter(db.BaseDatabase):
             columns = [col[0] for col in cursor.description]
             rows = [dict(zip(columns, row)) for row in rows]
             for row in rows:
-                if 'attrs' in row and isinstance(row['attrs'], str):
-                    row['attrs'] = json.loads(row['attrs'])
+                if "attrs" in row and isinstance(row["attrs"], str):
+                    row["attrs"] = json.loads(row["attrs"])
 
             return rows
         except sqlite3.Error as e:
-            logger.error(f"Experienced error getting sorters, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting sorters, returning empty list: {repr(e)}"
+            )
             return []
 
     def get_sorter_ids(self) -> list:
@@ -148,10 +175,20 @@ class PartSorter(db.BaseDatabase):
 
             return rows
         except sqlite3.Error as e:
-            logger.error(f"Experienced error getting sorters, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting sorters, returning empty list: {repr(e)}"
+            )
             return []
 
-    def update_sorter(self, uid: str, location: str = None, name: str = None, icon: str = None, tags: str = None, attributes: dict = None):
+    def update_sorter(
+        self,
+        uid: str,
+        location: str = None,
+        name: str = None,
+        icon: str = None,
+        tags: str = None,
+        attributes: dict = None,
+    ):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             updates = []
@@ -208,7 +245,9 @@ if __name__ == "__main__":
 
         if int(inp) in range(1, 10):
             if int(inp) == 1:
-                id_inp = input("ID for location, type 'auto' for auto-generated uuid >>> ")
+                id_inp = input(
+                    "ID for location, type 'auto' for auto-generated uuid >>> "
+                )
                 if id_inp == "auto":
                     id_inp = str(uuid.uuid4())
                 name_inp = input("Name for location >>> ")
@@ -217,7 +256,9 @@ if __name__ == "__main__":
 
                 attrs = {}
                 while True:
-                    key = input("Key for new attribute, type 'done' to quit inserting attrs >>> ")
+                    key = input(
+                        "Key for new attribute, type 'done' to quit inserting attrs >>> "
+                    )
                     if key == "done":
                         break
                     else:
@@ -234,25 +275,39 @@ if __name__ == "__main__":
                 pprint.pprint(sorter.get_locations())
             elif int(inp) == 4:
                 id_inp = input("ID for location >>> ")
-                name_inp = input("New name for location (leave empty to keep current) >>> ")
-                icon_inp = input("New icon for location (leave empty to keep current) >>> ")
-                tags_inp = input("New comma-separated tags for location (leave empty to keep current) >>> ")
+                name_inp = input(
+                    "New name for location (leave empty to keep current) >>> "
+                )
+                icon_inp = input(
+                    "New icon for location (leave empty to keep current) >>> "
+                )
+                tags_inp = input(
+                    "New comma-separated tags for location (leave empty to keep current) >>> "
+                )
 
                 attrs = None
-                update_attrs = input("Do you want to update attributes? (yes/no) >>> ").lower()
+                update_attrs = input(
+                    "Do you want to update attributes? (yes/no) >>> "
+                ).lower()
                 if update_attrs == "yes":
                     attrs = {}
                     while True:
-                        key = input("Key for new attribute, type 'done' to quit inserting attrs >>> ")
+                        key = input(
+                            "Key for new attribute, type 'done' to quit inserting attrs >>> "
+                        )
                         if key == "done":
                             break
                         else:
                             value = input(f"Value for new '{key}' >>> ")
                         attrs[key] = value
 
-                sorter.update_location(id_inp, name_inp or None, icon_inp or None, tags_inp or None, attrs)
+                sorter.update_location(
+                    id_inp, name_inp or None, icon_inp or None, tags_inp or None, attrs
+                )
             elif int(inp) == 5:
-                id_inp = input("ID for sorter, type 'auto' for auto-generated uuid >>> ")
+                id_inp = input(
+                    "ID for sorter, type 'auto' for auto-generated uuid >>> "
+                )
                 if id_inp == "auto":
                     id_inp = str(uuid.uuid4())
                 name_inp = input("Name for sorter >>> ")
@@ -262,14 +317,18 @@ if __name__ == "__main__":
 
                 attrs = {}
                 while True:
-                    key = input("Key for new attribute, type 'done' to quit inserting attrs >>> ")
+                    key = input(
+                        "Key for new attribute, type 'done' to quit inserting attrs >>> "
+                    )
                     if key == "done":
                         break
                     else:
                         value = input(f"Value for new '{key}' >>> ")
                     attrs[key] = value
 
-                sorter.create_sorter(id_inp, location_inp, name_inp, icon_inp, tags_inp, attrs)
+                sorter.create_sorter(
+                    id_inp, location_inp, name_inp, icon_inp, tags_inp, attrs
+                )
             elif int(inp) == 6:
                 id_inp = input("ID for sorter >>> ")
                 certain = input("Are you sure (YES) >>> ") == "YES"
@@ -279,29 +338,43 @@ if __name__ == "__main__":
                 pprint.pprint(sorter.get_sorters())
             elif int(inp) == 8:
                 id_inp = input("ID for sorter >>> ")
-                name_inp = input("New name for sorter (leave empty to keep current) >>> ")
-                icon_inp = input("New icon for sorter (leave empty to keep current) >>> ")
-                location_inp = input("New location for sorter (leave empty to keep current) >>> ")
-                tags_inp = input("New comma-separated tags for sorter (leave empty to keep current) >>> ")
+                name_inp = input(
+                    "New name for sorter (leave empty to keep current) >>> "
+                )
+                icon_inp = input(
+                    "New icon for sorter (leave empty to keep current) >>> "
+                )
+                location_inp = input(
+                    "New location for sorter (leave empty to keep current) >>> "
+                )
+                tags_inp = input(
+                    "New comma-separated tags for sorter (leave empty to keep current) >>> "
+                )
 
                 attrs = None
-                update_attrs = input("Do you want to update attributes? (yes/no) >>> ").lower()
+                update_attrs = input(
+                    "Do you want to update attributes? (yes/no) >>> "
+                ).lower()
                 if update_attrs == "yes":
                     attrs = {}
                     while True:
-                        key = input("Key for new attribute, type 'done' to quit inserting attrs >>> ")
+                        key = input(
+                            "Key for new attribute, type 'done' to quit inserting attrs >>> "
+                        )
                         if key == "done":
                             break
                         else:
                             value = input(f"Value for new '{key}' >>> ")
                         attrs[key] = value
 
-                sorter.update_sorter(id_inp,
-                                     location_inp or None,
-                                     name_inp or None,
-                                     icon_inp or None,
-                                     tags_inp or None,
-                                     attrs)
+                sorter.update_sorter(
+                    id_inp,
+                    location_inp or None,
+                    name_inp or None,
+                    icon_inp or None,
+                    tags_inp or None,
+                    attrs,
+                )
             elif int(inp) == 9:
                 sorter.end()
                 sys.exit()

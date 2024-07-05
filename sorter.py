@@ -10,22 +10,27 @@ class SorterIdInvalidException(BaseException):
 class PartSorter(db.BaseDatabase):
     def create_tables(self):
         with self.sqlite_connection:
-            self.sqlite_connection.execute("""CREATE TABLE IF NOT EXISTS locations (
+            self.sqlite_connection.execute(
+                """CREATE TABLE IF NOT EXISTS locations (
                                                                     id TEXT PRIMARY KEY UNIQUE, 
                                                                     name TEXT NOT NULL, 
                                                                     icon TEXT NOT NULL, 
                                                                     tags TEXT,
                                                                     attrs TEXT NOT NULL
-                                                                    )""")
-            self.sqlite_connection.execute("""CREATE TABLE IF NOT EXISTS sorters (
+                                                                    )"""
+            )
+            self.sqlite_connection.execute(
+                """CREATE TABLE IF NOT EXISTS sorters (
                                                                     id TEXT PRIMARY KEY UNIQUE,
                                                                     location TEXT NOT NULL,
                                                                     name TEXT NOT NULL,
                                                                     icon TEXT NOT NULL,
                                                                     tags TEXT,
                                                                     attrs TEXT NOT NULL
-                                                                    )""")
-            self.sqlite_connection.execute("""CREATE TABLE IF NOT EXISTS parts (
+                                                                    )"""
+            )
+            self.sqlite_connection.execute(
+                """CREATE TABLE IF NOT EXISTS parts (
                                                                         id TEXT PRIMARY KEY UNIQUE,
                                                                         sorter TEXT NOT NULL,
                                                                         name TEXT NOT NULL,
@@ -40,9 +45,11 @@ class PartSorter(db.BaseDatabase):
                                                                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                                                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                                                         attrs TEXT NOT NULL
-                                                                        )""")
-            
-            self.sqlite_connection.execute("""
+                                                                        )"""
+            )
+
+            self.sqlite_connection.execute(
+                """
                                             CREATE TRIGGER IF NOT EXISTS update_timestamp
                                             AFTER UPDATE ON parts
                                             FOR EACH ROW
@@ -51,15 +58,22 @@ class PartSorter(db.BaseDatabase):
                                                 SET updated_at = CURRENT_TIMESTAMP
                                                 WHERE id = OLD.id;
                                             END;
-                                            """)
+                                            """
+            )
 
-    def create_location(self, uid: str, name: str, icon: str, tags: str, attributes: dict):
+    def create_location(
+        self, uid: str, name: str, icon: str, tags: str, attributes: dict
+    ):
         if uid in self.get_location_ids():
-            raise SorterIdInvalidException(f"Another location with id: {uid} already exists")
+            raise SorterIdInvalidException(
+                f"Another location with id: {uid} already exists"
+            )
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("INSERT INTO locations (id,name,icon,tags,attrs) VALUES(?,?,?,?,?)",
-                           (uid, name, icon, tags, json.dumps(attributes)))
+            cursor.execute(
+                "INSERT INTO locations (id,name,icon,tags,attrs) VALUES(?,?,?,?,?)",
+                (uid, name, icon, tags, json.dumps(attributes)),
+            )
             cursor.close()
         logger.info(f"Created new location with id: {uid}")
 
@@ -68,8 +82,7 @@ class PartSorter(db.BaseDatabase):
             raise SorterIdInvalidException(f"Location with id: {uid} does not exist")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM locations WHERE id=?",
-                           (uid,))
+            cursor.execute("DELETE FROM locations WHERE id=?", (uid,))
 
     def get_locations(self) -> list:
         try:
@@ -79,12 +92,14 @@ class PartSorter(db.BaseDatabase):
             columns = [col[0] for col in cursor.description]
             rows = [dict(zip(columns, row)) for row in rows]
             for row in rows:
-                if 'attrs' in row and isinstance(row['attrs'], str):
-                    row['attrs'] = json.loads(row['attrs'])
+                if "attrs" in row and isinstance(row["attrs"], str):
+                    row["attrs"] = json.loads(row["attrs"])
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting locations, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting locations, returning empty list: {repr(e)}"
+            )
             return []
 
     def get_location_ids(self) -> list:
@@ -96,10 +111,19 @@ class PartSorter(db.BaseDatabase):
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting locations, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting locations, returning empty list: {repr(e)}"
+            )
             return []
 
-    def update_location(self, uid: str, name: str = None, icon: str = None, tags: str = None, attributes: dict = None):
+    def update_location(
+        self,
+        uid: str,
+        name: str | None = None,
+        icon: str | None = None,
+        tags: str | None = None,
+        attributes: dict | None = None,
+    ):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             updates = []
@@ -128,17 +152,25 @@ class PartSorter(db.BaseDatabase):
             cursor.close()
         logger.info(f"Updated location with id: {uid}")
 
-    def create_sorter(self, uid: str, location: str, name: str, icon: str, tags: str, attributes: dict):
+    def create_sorter(
+        self, uid: str, location: str, name: str, icon: str, tags: str, attributes: dict
+    ):
         if location not in self.get_location_ids():
-            raise SorterIdInvalidException(f"Location ID: {location} not in locations, {self.get_location_ids()}")
+            raise SorterIdInvalidException(
+                f"Location ID: {location} not in locations, {self.get_location_ids()}"
+            )
 
         if uid in self.get_sorter_ids():
-            raise SorterIdInvalidException(f"Sorter ID: {uid} already in {self.get_sorter_ids()}")
+            raise SorterIdInvalidException(
+                f"Sorter ID: {uid} already in {self.get_sorter_ids()}"
+            )
 
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("INSERT INTO sorters (id,location,name,icon,tags,attrs) VALUES(?,?,?,?,?,?)",
-                           (uid, location, name, icon, tags, json.dumps(attributes)))
+            cursor.execute(
+                "INSERT INTO sorters (id,location,name,icon,tags,attrs) VALUES(?,?,?,?,?,?)",
+                (uid, location, name, icon, tags, json.dumps(attributes)),
+            )
             cursor.close()
         logger.info(f"Created new sorter with id: {uid}")
 
@@ -147,8 +179,7 @@ class PartSorter(db.BaseDatabase):
             raise SorterIdInvalidException(f"Sorter with id: {uid} does not exist")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM sorters WHERE id=?",
-                           (uid,))
+            cursor.execute("DELETE FROM sorters WHERE id=?", (uid,))
 
     def get_sorters(self) -> list:
         try:
@@ -158,12 +189,14 @@ class PartSorter(db.BaseDatabase):
             columns = [col[0] for col in cursor.description]
             rows = [dict(zip(columns, row)) for row in rows]
             for row in rows:
-                if 'attrs' in row and isinstance(row['attrs'], str):
-                    row['attrs'] = json.loads(row['attrs'])
+                if "attrs" in row and isinstance(row["attrs"], str):
+                    row["attrs"] = json.loads(row["attrs"])
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting sorters, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting sorters, returning empty list: {repr(e)}"
+            )
             return []
 
     def get_sorter_ids(self) -> list:
@@ -175,17 +208,20 @@ class PartSorter(db.BaseDatabase):
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting sorters, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting sorters, returning empty list: {repr(e)}"
+            )
             return []
 
-    def update_sorter(self,
-                      uid: str,
-                      location: str = None,
-                      name: str = None,
-                      icon: str = None,
-                      tags: str = None,
-                      attributes: dict = None
-                      ):
+    def update_sorter(
+        self,
+        uid: str,
+        location: str | None = None,
+        name: str | None = None,
+        icon: str | None = None,
+        tags: str | None = None,
+        attributes: dict | None = None,
+    ):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             updates = []
@@ -218,19 +254,50 @@ class PartSorter(db.BaseDatabase):
             cursor.close()
         logger.info(f"Updated sorter with id: {uid}")
 
-    def create_part(self, uid: str, sorter: str, name: str, quantity: int, quantity_type: str, enable_quantity: bool, tags: str, price: float, notes: str, location: str, attributes: dict):
+    def create_part(
+        self,
+        uid: str,
+        sorter: str,
+        name: str,
+        quantity: int,
+        quantity_type: str,
+        enable_quantity: bool,
+        tags: str,
+        price: float,
+        notes: str,
+        location: str,
+        attributes: dict,
+    ):
         if sorter not in self.get_sorter_ids():
-            raise SorterIdInvalidException(f"Sorter ID: {sorter} not in sorters, {self.get_sorter_ids()}")
+            raise SorterIdInvalidException(
+                f"Sorter ID: {sorter} not in sorters, {self.get_sorter_ids()}"
+            )
 
-        if uid in self.get_part_uids():
-            raise SorterIdInvalidException(f"Part ID: {uid} already in {self.get_part_ids()}")
+        if uid in self.get_part_ids():
+            raise SorterIdInvalidException(
+                f"Part ID: {uid} already in {self.get_part_ids()}"
+            )
 
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("INSERT INTO sorters "
-                           "(id,sorter,name,tags,quantity,quantity_type,enable_quantity,price,notes,location,attrs) "
-                           "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                           (uid, sorter, name, tags, quantity, quantity_type, enable_quantity, price, notes, location, json.dumps(attributes)))
+            cursor.execute(
+                "INSERT INTO sorters "
+                "(id,sorter,name,tags,quantity,quantity_type,enable_quantity,price,notes,location,attrs) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    uid,
+                    sorter,
+                    name,
+                    tags,
+                    quantity,
+                    quantity_type,
+                    enable_quantity,
+                    price,
+                    notes,
+                    location,
+                    json.dumps(attributes),
+                ),
+            )
             cursor.close()
         logger.info(f"Created new part with id: {uid}")
 
@@ -245,8 +312,7 @@ class PartSorter(db.BaseDatabase):
             raise SorterIdInvalidException(f"Part with id: {uid} does not exist")
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM parts WHERE id=?",
-                           (uid,))
+            cursor.execute("DELETE FROM parts WHERE id=?", (uid,))
 
     def get_parts(self) -> list:
         try:
@@ -256,16 +322,20 @@ class PartSorter(db.BaseDatabase):
             columns = [col[0] for col in cursor.description]
             rows = [dict(zip(columns, row)) for row in rows]
             for row in rows:
-                if 'attrs' in row and isinstance(row['attrs'], str):
+                if "attrs" in row and isinstance(row["attrs"], str):
                     try:
-                        row['attrs'] = json.loads(row['attrs'])
+                        row["attrs"] = json.loads(row["attrs"])
                     except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to decode attrs json for part {row['id']}, {repr(e)}")
-                        row['attrs'] = {}
+                        logger.warning(
+                            f"Failed to decode attrs json for part {row['id']}, {repr(e)}"
+                        )
+                        row["attrs"] = {}
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting parts, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting parts, returning empty list: {repr(e)}"
+            )
             return []
 
     def get_part_ids(self) -> list:
@@ -277,10 +347,25 @@ class PartSorter(db.BaseDatabase):
 
             return rows
         except db.Error as e:
-            logger.error(f"Experienced error getting part ids, returning empty list: {repr(e)}")
+            logger.error(
+                f"Experienced error getting part ids, returning empty list: {repr(e)}"
+            )
             return []
 
-    def update_part(self, uid: str, sorter: str | None, name: str | None, quantity: int | None, quantity_type: str | None, enable_quantity: bool | None, tags: str | None, price: float | None, notes: str | None, location: str | None, attributes: dict | None):
+    def update_part(
+        self,
+        uid: str,
+        sorter: str | None,
+        name: str | None,
+        quantity: int | None,
+        quantity_type: str | None,
+        enable_quantity: bool | None,
+        tags: str | None,
+        price: float | None,
+        notes: str | None,
+        location: str | None,
+        attributes: dict | None,
+    ):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             updates = []
