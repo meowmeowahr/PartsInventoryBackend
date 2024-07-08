@@ -195,7 +195,14 @@ def create_part(part_item: Part):
 
 @app.get("/parts/", response_model=List[Part])
 def get_parts():
-    return part_sorter.get_parts()
+    parts = part_sorter.get_parts()
+    parts_without_images = []
+    for part in parts:
+        part.pop("image")
+        parts_without_images.append(part)
+        
+
+    return parts_without_images
 
 
 @app.get("/parts/{sorter_id}", response_model=List[Part])

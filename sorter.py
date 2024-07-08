@@ -281,7 +281,7 @@ class PartSorter(db.BaseDatabase):
         with self.sqlite_connection:
             cursor = self.sqlite_connection.cursor()
             cursor.execute(
-                "INSERT INTO sorters "
+                "INSERT INTO parts "
                 "(id,sorter,name,tags,quantity,quantity_type,enable_quantity,price,notes,location,attrs) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (
