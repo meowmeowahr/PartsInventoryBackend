@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import httpx
 from pydantic import BaseModel
 from typing import List
 
@@ -71,6 +72,9 @@ class PartImageNullable(BaseModel):
     id: str
     image: str | None
 
+class PartIdentify(BaseModel):
+    location: str
+    api: str
 
 @app.post("/locations/", response_model=Location, status_code=201)
 def create_location(location: Location):
@@ -264,6 +268,21 @@ def delete_part(part_id: str):
     except sorter.SorterIdInvalidException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@app.post("/part_identify/")
+async def identify_part(response: PartIdentify):
+    # Define the target endpoint URL of the different server
+
+    # Send the request to the target endpoint on the different server
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(response.api, json={"location": response.location})
+            res.raise_for_status()  # Raise an exception for 4xx/5xx responses
+            return res.json()
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
 
 if __name__ == "__main__":
     import uvicorn
