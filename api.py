@@ -72,9 +72,11 @@ class PartImageNullable(BaseModel):
     id: str
     image: str | None
 
+
 class PartIdentify(BaseModel):
     location: str
     api: str
+
 
 @app.post("/locations/", response_model=Location, status_code=201)
 def create_location(location: Location):
@@ -204,7 +206,6 @@ def get_parts():
     for part in parts:
         part.pop("image")
         parts_without_images.append(part)
-        
 
     return parts_without_images
 
@@ -280,9 +281,12 @@ async def identify_part(response: PartIdentify):
             res.raise_for_status()  # Raise an exception for 4xx/5xx responses
             return res.json()
         except httpx.HTTPStatusError as exc:
-            raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+            raise HTTPException(
+                status_code=exc.response.status_code, detail=exc.response.text
+            )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
+
 
 if __name__ == "__main__":
     import uvicorn
