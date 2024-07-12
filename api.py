@@ -1,11 +1,39 @@
+import sys
+import traceback
+import urllib.parse
+from typing import List
+
+import httpx
+import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import httpx
+from loguru import logger
 from pydantic import BaseModel
-from typing import List
-import urllib.parse
 
 import sorter  # Make sure to import your database module here
+
+# Import yaml config
+with open("config.yaml", encoding="utf-8") as stream:
+    try:
+        configuration: dict = yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+        traceback.print_exc()
+        logger.critical("YAML Parsing Error, %s", exc)
+        sys.exit(0)
+
+if not configuration:
+    configuration: dict = {}
+
+# logging config
+logging_config: dict = configuration.get("logging", {})
+logging_level: int = logging_config.get("level", 20)
+logger.remove()
+logger.add(sys.stdout, level=logging_level)
+
+# server config
+server_config: dict = configuration.get("server", {})
+server_port: int = int(server_config.get("ip", 8000))
+server_host: str = str(server_config.get("host", "0.0.0.0"))
 
 app = FastAPI()
 
@@ -289,4 +317,4 @@ async def identify_part(response: PartIdentify):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host=server_host, port=server_port)
