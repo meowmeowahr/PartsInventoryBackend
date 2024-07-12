@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import httpx
 from pydantic import BaseModel
 from typing import List
+import urllib.parse
 
 import sorter  # Make sure to import your database module here
 
@@ -272,12 +273,9 @@ def delete_part(part_id: str):
 
 @app.post("/part_identify/")
 async def identify_part(response: PartIdentify):
-    # Define the target endpoint URL of the different server
-
-    # Send the request to the target endpoint on the different server
     async with httpx.AsyncClient() as client:
         try:
-            res = await client.post(response.api, json={"location": response.location})
+            res = await client.post(urllib.parse.urljoin(response.api, "/identify"), json={"location": response.location})
             res.raise_for_status()  # Raise an exception for 4xx/5xx responses
             return res.json()
         except httpx.HTTPStatusError as exc:
