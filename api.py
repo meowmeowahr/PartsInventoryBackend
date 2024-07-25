@@ -1,7 +1,7 @@
 import sys
 import traceback
 import urllib.parse
-from typing import List
+from typing import List, Optional
 
 import httpx
 import yaml
@@ -9,8 +9,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pydantic import BaseModel
+import psutil
 
 import sorter  # Make sure to import your database module here
+import fetch_version
+
+__version__ = "0.1.0"
+__repo__ = ["meowmeowahr", "PartsInventoryBackend"]
 
 # Import yaml config
 with open("config.yaml", encoding="utf-8") as stream:
@@ -105,6 +110,30 @@ class PartImageNullable(BaseModel):
 class PartIdentify(BaseModel):
     location: str
     api: str
+
+
+class SystemInfo(BaseModel):
+    version: str
+    latest_version: Optional[str]
+    min_app_version: str
+    cpu_usage: float
+    memory_usage: float
+
+
+@app.get("/info/", response_model=SystemInfo)
+async def get_info(fetch_github: bool = True):
+    if fetch_github:
+        latest_version = await fetch_version.fetch_latest_tag(*__repo__)
+    else:
+        latest_version = "Unknown"
+
+    return {
+        "version": __version__,
+        "latest_version": latest_version,
+        "min_app_version": "0.1.0",
+        "cpu_usage": psutil.cpu_percent(),
+        "memory_usage": psutil.virtual_memory().percent
+    }
 
 
 @app.post("/locations/", response_model=Location, status_code=201)
@@ -303,7 +332,8 @@ def delete_part(part_id: str):
 async def identify_part(response: PartIdentify):
     async with httpx.AsyncClient() as client:
         try:
-            res = await client.post(urllib.parse.urljoin(response.api, "/identify"), json={"location": response.location})
+            res = await client.post(urllib.parse.urljoin(response.api, "/identify"),
+                                    json={"location": response.location})
             res.raise_for_status()  # Raise an exception for 4xx/5xx responses
             return res.json()
         except httpx.HTTPStatusError as exc:
