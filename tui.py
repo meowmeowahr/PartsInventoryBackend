@@ -7,7 +7,7 @@ import time
 import sys
 
 import db
-import sorter3
+import sorter
 
 
 class PartSorter(db.BaseDatabase):
