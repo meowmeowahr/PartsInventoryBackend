@@ -1,4 +1,5 @@
 import sys
+import os
 import traceback
 import urllib.parse
 from typing import List, Optional
@@ -17,8 +18,10 @@ import fetch_version
 __version__ = "0.1.0"
 __repo__ = ["meowmeowahr", "PartsInventoryBackend"]
 
+CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 # Import yaml config
-with open("config.yaml", encoding="utf-8") as stream:
+with open(os.path.join(CURRENT_DIR, "config.yaml"), encoding="utf-8") as stream:
     try:
         configuration: dict = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
