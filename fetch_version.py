@@ -13,7 +13,7 @@ async def fetch_latest_tag(owner: str, repo: str) -> str:
     valid_tags = []
 
     for tag in tags:
-        tag_name = tag['name']
+        tag_name = tag["name"]
         try:
             # Check if the tag name follows semver and is not a pre-release
             version = semver.VersionInfo.parse(tag_name)

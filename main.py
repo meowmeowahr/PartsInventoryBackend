@@ -135,7 +135,7 @@ async def get_info(fetch_github: bool = True):
         "latest_version": latest_version,
         "min_app_version": "0.1.0",
         "cpu_usage": psutil.cpu_percent(),
-        "memory_usage": psutil.virtual_memory().percent
+        "memory_usage": psutil.virtual_memory().percent,
     }
 
 
@@ -335,8 +335,10 @@ def delete_part(part_id: str):
 async def identify_part(response: PartIdentify):
     async with httpx.AsyncClient() as client:
         try:
-            res = await client.post(urllib.parse.urljoin(response.api, "/identify"),
-                                    json={"location": response.location})
+            res = await client.post(
+                urllib.parse.urljoin(response.api, "/identify"),
+                json={"location": response.location},
+            )
             res.raise_for_status()  # Raise an exception for 4xx/5xx responses
             return res.json()
         except httpx.HTTPStatusError as exc:
@@ -349,4 +351,5 @@ async def identify_part(response: PartIdentify):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host=server_host, port=server_port)
