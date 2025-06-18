@@ -1,119 +1,82 @@
-import db
-import json
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
+from models import Base, Location, Sorter, Part
+import json
+from typing import List, Dict, Optional
 
 
-class SorterIdInvalidException(BaseException):
+class SorterIdInvalidException(Exception):
     pass
 
 
-class PartSorter(db.BaseDatabase):
+class PartSorter:
+    def __init__(self, database_url: str = "sqlite:///partsdb.sqlite"):
+        self.engine = create_engine(database_url)
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        
+    def get_session(self) -> Session:
+        return self.SessionLocal()
+    
     def create_tables(self):
-        with self.sqlite_connection:
-            self.sqlite_connection.execute(
-                """CREATE TABLE IF NOT EXISTS locations (
-                                                                    id TEXT PRIMARY KEY UNIQUE, 
-                                                                    name TEXT NOT NULL, 
-                                                                    icon TEXT NOT NULL, 
-                                                                    tags TEXT,
-                                                                    attrs TEXT NOT NULL
-                                                                    )"""
-            )
-            self.sqlite_connection.execute(
-                """CREATE TABLE IF NOT EXISTS sorters (
-                                                                    id TEXT PRIMARY KEY UNIQUE,
-                                                                    location TEXT NOT NULL,
-                                                                    name TEXT NOT NULL,
-                                                                    icon TEXT NOT NULL,
-                                                                    tags TEXT,
-                                                                    attrs TEXT NOT NULL
-                                                                    )"""
-            )
-            self.sqlite_connection.execute(
-                """CREATE TABLE IF NOT EXISTS parts (
-                                                                        id TEXT PRIMARY KEY UNIQUE,
-                                                                        sorter TEXT NOT NULL,
-                                                                        name TEXT NOT NULL,
-                                                                        image BLOB,
-                                                                        tags TEXT NOT NULL DEFAULT '',
-                                                                        quantity INTEGER NOT NULL,
-                                                                        quantity_type TEXT NOT NULL DEFAULT 'pcs',
-                                                                        enable_quantity BOOLEAN NOT NULL DEFAULT TRUE,
-                                                                        price DECIMAL NOT NULL DEFAULT 0.00,
-                                                                        notes TEXT,
-                                                                        location TEXT NOT NULL,
-                                                                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                                                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                                                        attrs TEXT NOT NULL
-                                                                        )"""
-            )
+        """Create tables using SQLAlchemy models (use alembic upgrade instead)"""
+        Base.metadata.create_all(bind=self.engine)
+        logger.info("Tables created using SQLAlchemy models")
 
-            self.sqlite_connection.execute(
-                """
-                                            CREATE TRIGGER IF NOT EXISTS update_timestamp
-                                            AFTER UPDATE ON parts
-                                            FOR EACH ROW
-                                            BEGIN
-                                                UPDATE parts
-                                                SET updated_at = CURRENT_TIMESTAMP
-                                                WHERE id = OLD.id;
-                                            END;
-                                            """
+    # Location methods
+    def create_location(self, uid: str, name: str, icon: str, tags: str, attributes: dict):
+        with self.get_session() as session:
+            if session.query(Location).filter(Location.id == uid).first():
+                raise SorterIdInvalidException(f"Another location with id: {uid} already exists")
+            
+            location = Location(
+                id=uid,
+                name=name,
+                icon=icon,
+                tags=tags,
+                attrs=json.dumps(attributes)
             )
-
-    def create_location(
-        self, uid: str, name: str, icon: str, tags: str, attributes: dict
-    ):
-        if uid in self.get_location_ids():
-            raise SorterIdInvalidException(
-                f"Another location with id: {uid} already exists"
-            )
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute(
-                "INSERT INTO locations (id,name,icon,tags,attrs) VALUES(?,?,?,?,?)",
-                (uid, name, icon, tags, json.dumps(attributes)),
-            )
-            cursor.close()
-        logger.info(f"Created new location with id: {uid}")
+            session.add(location)
+            session.commit()
+            logger.info(f"Created new location with id: {uid}")
 
     def delete_location(self, uid: str):
-        if uid not in self.get_location_ids():
-            raise SorterIdInvalidException(f"Location with id: {uid} does not exist")
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM locations WHERE id=?", (uid,))
+        with self.get_session() as session:
+            location = session.query(Location).filter(Location.id == uid).first()
+            if not location:
+                raise SorterIdInvalidException(f"Location with id: {uid} does not exist")
+            
+            session.delete(location)
+            session.commit()
+            logger.info(f"Deleted location with id: {uid}")
 
-    def get_locations(self) -> list:
+    def get_locations(self) -> List[Dict]:
         try:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("SELECT * FROM locations")
-            rows = cursor.fetchall()
-            columns = [col[0] for col in cursor.description]
-            rows = [dict(zip(columns, row)) for row in rows]
-            for row in rows:
-                if "attrs" in row and isinstance(row["attrs"], str):
-                    row["attrs"] = json.loads(row["attrs"])
-
-            return rows
-        except db.Error as e:
-            logger.error(
-                f"Experienced error getting locations, returning empty list: {repr(e)}"
-            )
+            with self.get_session() as session:
+                locations = session.query(Location).all()
+                result = []
+                for location in locations:
+                    location_dict = {
+                        'id': location.id,
+                        'name': location.name,
+                        'icon': location.icon,
+                        'tags': location.tags,
+                        'attrs': location.attributes
+                    }
+                    result.append(location_dict)
+                return result
+        except SQLAlchemyError as e:
+            logger.error(f"Experienced error getting locations, returning empty list: {repr(e)}")
             return []
 
-    def get_location_ids(self) -> list:
+    def get_location_ids(self) -> List[str]:
         try:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("SELECT id FROM locations")
-            rows = cursor.fetchall()
-            rows = [row[0] for row in rows]
-
-            return rows
-        except db.Error as e:
-            logger.error(
-                f"Experienced error getting locations, returning empty list: {repr(e)}"
-            )
+            with self.get_session() as session:
+                location_ids = session.query(Location.id).all()
+                return [lid[0] for lid in location_ids]
+        except SQLAlchemyError as e:
+            logger.error(f"Experienced error getting location ids, returning empty list: {repr(e)}")
             return []
 
     def update_location(
@@ -124,93 +87,85 @@ class PartSorter(db.BaseDatabase):
         tags: str | None = None,
         attributes: dict | None = None,
     ):
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            updates = []
-            params = []
-
+        with self.get_session() as session:
+            location = session.query(Location).filter(Location.id == uid).first()
+            if not location:
+                raise SorterIdInvalidException(f"Location with id: {uid} does not exist")
+            
             if name is not None:
-                updates.append("name = ?")
-                params.append(name)
-
+                location.name = name
             if icon is not None:
-                updates.append("icon = ?")
-                params.append(icon)
-
+                location.icon = icon
             if tags is not None:
-                updates.append("tags = ?")
-                params.append(tags)
-
+                location.tags = tags
             if attributes is not None:
-                updates.append("attrs = ?")
-                params.append(json.dumps(attributes))
+                location.attrs = json.dumps(attributes)
+            
+            session.commit()
+            logger.info(f"Updated location with id: {uid}")
 
-            params.append(uid)
-
-            query = f"UPDATE locations SET {', '.join(updates)} WHERE id = ?"
-            cursor.execute(query, params)
-            cursor.close()
-        logger.info(f"Updated location with id: {uid}")
-
+    # Sorter methods
     def create_sorter(
         self, uid: str, location: str, name: str, icon: str, tags: str, attributes: dict
     ):
-        if location not in self.get_location_ids():
-            raise SorterIdInvalidException(
-                f"Location ID: {location} not in locations, {self.get_location_ids()}"
-            )
+        with self.get_session() as session:
+            if not session.query(Location).filter(Location.id == location).first():
+                raise SorterIdInvalidException(
+                    f"Location ID: {location} not in locations"
+                )
 
-        if uid in self.get_sorter_ids():
-            raise SorterIdInvalidException(
-                f"Sorter ID: {uid} already in {self.get_sorter_ids()}"
-            )
+            if session.query(Sorter).filter(Sorter.id == uid).first():
+                raise SorterIdInvalidException(f"Sorter ID: {uid} already exists")
 
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute(
-                "INSERT INTO sorters (id,location,name,icon,tags,attrs) VALUES(?,?,?,?,?,?)",
-                (uid, location, name, icon, tags, json.dumps(attributes)),
+            sorter = Sorter(
+                id=uid,
+                location=location,
+                name=name,
+                icon=icon,
+                tags=tags,
+                attrs=json.dumps(attributes)
             )
-            cursor.close()
-        logger.info(f"Created new sorter with id: {uid}")
+            session.add(sorter)
+            session.commit()
+            logger.info(f"Created new sorter with id: {uid}")
 
     def delete_sorter(self, uid: str):
-        if uid not in self.get_sorter_ids():
-            raise SorterIdInvalidException(f"Sorter with id: {uid} does not exist")
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM sorters WHERE id=?", (uid,))
+        with self.get_session() as session:
+            sorter = session.query(Sorter).filter(Sorter.id == uid).first()
+            if not sorter:
+                raise SorterIdInvalidException(f"Sorter with id: {uid} does not exist")
+            
+            session.delete(sorter)
+            session.commit()
+            logger.info(f"Deleted sorter with id: {uid}")
 
-    def get_sorters(self) -> list:
+    def get_sorters(self) -> List[Dict]:
         try:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("SELECT * FROM sorters")
-            rows = cursor.fetchall()
-            columns = [col[0] for col in cursor.description]
-            rows = [dict(zip(columns, row)) for row in rows]
-            for row in rows:
-                if "attrs" in row and isinstance(row["attrs"], str):
-                    row["attrs"] = json.loads(row["attrs"])
-
-            return rows
-        except db.Error as e:
-            logger.error(
-                f"Experienced error getting sorters, returning empty list: {repr(e)}"
-            )
+            with self.get_session() as session:
+                sorters = session.query(Sorter).all()
+                result = []
+                for sorter in sorters:
+                    sorter_dict = {
+                        'id': sorter.id,
+                        'location': sorter.location,
+                        'name': sorter.name,
+                        'icon': sorter.icon,
+                        'tags': sorter.tags,
+                        'attrs': sorter.attributes
+                    }
+                    result.append(sorter_dict)
+                return result
+        except SQLAlchemyError as e:
+            logger.error(f"Experienced error getting sorters, returning empty list: {repr(e)}")
             return []
 
-    def get_sorter_ids(self) -> list:
+    def get_sorter_ids(self) -> List[str]:
         try:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("SELECT id FROM sorters")
-            rows = cursor.fetchall()
-            rows = [row[0] for row in rows]
-
-            return rows
-        except db.Error as e:
-            logger.error(
-                f"Experienced error getting sorters, returning empty list: {repr(e)}"
-            )
+            with self.get_session() as session:
+                sorter_ids = session.query(Sorter.id).all()
+                return [sid[0] for sid in sorter_ids]
+        except SQLAlchemyError as e:
+            logger.error(f"Experienced error getting sorter ids, returning empty list: {repr(e)}")
             return []
 
     def update_sorter(
@@ -222,38 +177,26 @@ class PartSorter(db.BaseDatabase):
         tags: str | None = None,
         attributes: dict | None = None,
     ):
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            updates = []
-            params = []
-
+        with self.get_session() as session:
+            sorter = session.query(Sorter).filter(Sorter.id == uid).first()
+            if not sorter:
+                raise SorterIdInvalidException(f"Sorter with id: {uid} does not exist")
+            
             if location is not None:
-                updates.append("location = ?")
-                params.append(location)
-
+                sorter.location = location
             if name is not None:
-                updates.append("name = ?")
-                params.append(name)
-
+                sorter.name = name
             if icon is not None:
-                updates.append("icon = ?")
-                params.append(icon)
-
+                sorter.icon = icon
             if tags is not None:
-                updates.append("tags = ?")
-                params.append(tags)
-
+                sorter.tags = tags
             if attributes is not None:
-                updates.append("attrs = ?")
-                params.append(json.dumps(attributes))
+                sorter.attrs = json.dumps(attributes)
+            
+            session.commit()
+            logger.info(f"Updated sorter with id: {uid}")
 
-            params.append(uid)
-
-            query = f"UPDATE sorters SET {', '.join(updates)} WHERE id = ?"
-            cursor.execute(query, params)
-            cursor.close()
-        logger.info(f"Updated sorter with id: {uid}")
-
+    # Part methods
     def create_part(
         self,
         uid: str,
@@ -268,152 +211,127 @@ class PartSorter(db.BaseDatabase):
         location: str,
         attributes: dict,
     ):
-        if sorter not in self.get_sorter_ids():
-            raise SorterIdInvalidException(
-                f"Sorter ID: {sorter} not in sorters, {self.get_sorter_ids()}"
-            )
+        with self.get_session() as session:
+            if not session.query(Sorter).filter(Sorter.id == sorter).first():
+                raise SorterIdInvalidException(f"Sorter ID: {sorter} not found")
 
-        if uid in self.get_part_ids():
-            raise SorterIdInvalidException(
-                f"Part ID: {uid} already in {self.get_part_ids()}"
-            )
+            if session.query(Part).filter(Part.id == uid).first():
+                raise SorterIdInvalidException(f"Part ID: {uid} already exists")
 
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute(
-                "INSERT INTO parts "
-                "(id,sorter,name,tags,quantity,quantity_type,enable_quantity,price,notes,location,attrs) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    uid,
-                    sorter,
-                    name,
-                    tags,
-                    quantity,
-                    quantity_type,
-                    enable_quantity,
-                    price,
-                    notes,
-                    location,
-                    json.dumps(attributes),
-                ),
+            part = Part(
+                id=uid,
+                sorter=sorter,
+                name=name,
+                tags=tags,
+                quantity=quantity,
+                quantity_type=quantity_type,
+                enable_quantity=enable_quantity,
+                price=price,
+                notes=notes,
+                location=location,
+                attrs=json.dumps(attributes)
             )
-            cursor.close()
-        logger.info(f"Created new part with id: {uid}")
+            session.add(part)
+            session.commit()
+            logger.info(f"Created new part with id: {uid}")
 
     def set_part_image(self, uid: str, image: str | None):
-        cursor = self.sqlite_connection.cursor()
-        cursor.execute("UPDATE parts SET image = ? WHERE id = ?", (image, uid))
-        cursor.close()
-        self.sqlite_connection.commit()
+        with self.get_session() as session:
+            part = session.query(Part).filter(Part.id == uid).first()
+            if not part:
+                raise SorterIdInvalidException(f"Part with id: {uid} does not exist")
+            
+            part.image = image
+            session.commit()
+            logger.info(f"Updated image for part with id: {uid}")
 
     def delete_part(self, uid: str):
-        if uid not in self.get_part_ids():
-            raise SorterIdInvalidException(f"Part with id: {uid} does not exist")
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("DELETE FROM parts WHERE id=?", (uid,))
+        with self.get_session() as session:
+            part = session.query(Part).filter(Part.id == uid).first()
+            if not part:
+                raise SorterIdInvalidException(f"Part with id: {uid} does not exist")
+            
+            session.delete(part)
+            session.commit()
+            logger.info(f"Deleted part with id: {uid}")
 
-    def get_parts(self) -> list:
+    def get_parts(self) -> List[Dict]:
         try:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("SELECT * FROM parts")
-            rows = cursor.fetchall()
-            columns = [col[0] for col in cursor.description]
-            rows = [dict(zip(columns, row)) for row in rows]
-            for row in rows:
-                if "attrs" in row and isinstance(row["attrs"], str):
-                    try:
-                        row["attrs"] = json.loads(row["attrs"])
-                    except json.JSONDecodeError as e:
-                        logger.warning(
-                            f"Failed to decode attrs json for part {row['id']}, {repr(e)}"
-                        )
-                        row["attrs"] = {}
-
-            return rows
-        except db.Error as e:
-            logger.error(
-                f"Experienced error getting parts, returning empty list: {repr(e)}"
-            )
+            with self.get_session() as session:
+                parts = session.query(Part).all()
+                result = []
+                for part in parts:
+                    part_dict = {
+                        'id': part.id,
+                        'sorter': part.sorter,
+                        'name': part.name,
+                        'image': part.image,
+                        'image_hash': part.image_hash,
+                        'tags': part.tags,
+                        'quantity': part.quantity,
+                        'quantity_type': part.quantity_type,
+                        'enable_quantity': part.enable_quantity,
+                        'price': float(part.price) if part.price else 0.0,
+                        'notes': part.notes,
+                        'location': part.location,
+                        'created_at': part.created_at,
+                        'updated_at': part.updated_at,
+                        'attrs': part.attributes
+                    }
+                    result.append(part_dict)
+                return result
+        except SQLAlchemyError as e:
+            logger.error(f"Experienced error getting parts, returning empty list: {repr(e)}")
             return []
 
-    def get_part_ids(self) -> list:
+    def get_part_ids(self) -> List[str]:
         try:
-            cursor = self.sqlite_connection.cursor()
-            cursor.execute("SELECT id FROM parts")
-            rows = cursor.fetchall()
-            rows = [row[0] for row in rows]
-
-            return rows
-        except db.Error as e:
-            logger.error(
-                f"Experienced error getting part ids, returning empty list: {repr(e)}"
-            )
+            with self.get_session() as session:
+                part_ids = session.query(Part.id).all()
+                return [pid[0] for pid in part_ids]
+        except SQLAlchemyError as e:
+            logger.error(f"Experienced error getting part ids, returning empty list: {repr(e)}")
             return []
 
     def update_part(
         self,
         uid: str,
-        sorter: str | None,
-        name: str | None,
-        quantity: int | None,
-        quantity_type: str | None,
-        enable_quantity: bool | None,
-        tags: str | None,
-        price: float | None,
-        notes: str | None,
-        location: str | None,
-        attributes: dict | None,
+        sorter: str | None = None,
+        name: str | None = None,
+        quantity: int | None = None,
+        quantity_type: str | None = None,
+        enable_quantity: bool | None = None,
+        tags: str | None = None,
+        price: float | None = None,
+        notes: str | None = None,
+        location: str | None = None,
+        attributes: dict | None = None,
     ):
-        with self.sqlite_connection:
-            cursor = self.sqlite_connection.cursor()
-            updates = []
-            params = []
-
+        with self.get_session() as session:
+            part = session.query(Part).filter(Part.id == uid).first()
+            if not part:
+                raise SorterIdInvalidException(f"Part with id: {uid} does not exist")
+            
             if sorter is not None:
-                updates.append("sorter = ?")
-                params.append(sorter)
-
+                part.sorter = sorter
             if name is not None:
-                updates.append("name = ?")
-                params.append(name)
-
+                part.name = name
             if quantity is not None:
-                updates.append("quantity = ?")
-                params.append(quantity)
-
+                part.quantity = quantity
             if quantity_type is not None:
-                updates.append("quantity_type = ?")
-                params.append(quantity_type)
-
+                part.quantity_type = quantity_type
             if enable_quantity is not None:
-                updates.append("enable_quantity = ?")
-                params.append(enable_quantity)
-
+                part.enable_quantity = enable_quantity
             if tags is not None:
-                updates.append("tags = ?")
-                params.append(tags)
-
+                part.tags = tags
             if price is not None:
-                updates.append("price = ?")
-                params.append(price)
-
+                part.price = price
             if notes is not None:
-                updates.append("notes = ?")
-                params.append(notes)
-
+                part.notes = notes
             if location is not None:
-                updates.append("location = ?")
-                params.append(location)
-
+                part.location = location
             if attributes is not None:
-                updates.append("attrs = ?")
-                params.append(json.dumps(attributes))
-
-            params.append(uid)
-
-            query = f"UPDATE parts SET {', '.join(updates)} WHERE id = ?"
-            cursor.execute(query, params)
-            cursor.close()
-        logger.info(f"Updated part with id: {uid}")
+                part.attrs = json.dumps(attributes)
+            
+            session.commit()
+            logger.info(f"Updated part with id: {uid}")

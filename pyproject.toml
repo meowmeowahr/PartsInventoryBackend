@@ -13,4 +13,6 @@ dependencies = [
     "loguru~=0.7.2",
     "psutil~=6.0.0",
     "semver~=3.0.2",
+    "sqlalchemy~=2.0.41",
+    "alembic~=1.16.2"
 ]
