@@ -349,5 +349,4 @@ async def identify_part(response: PartIdentify):
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host=server_host, port=server_port)
